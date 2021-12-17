@@ -2,6 +2,7 @@ package gaia
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/x/mintIbc"
 	"io"
 	stdlog "log"
 	"net/http"
@@ -105,6 +106,8 @@ import (
 
 	// unnamed import of statik for swagger UI support
 	_ "github.com/cosmos/cosmos-sdk/client/docs/statik"
+	mintIbcKeeper "github.com/cosmos/cosmos-sdk/x/mintIbc/keeper"
+	mintIbctypes "github.com/cosmos/cosmos-sdk/x/mintIbc/types"
 )
 
 const appName = "GaiaApp"
@@ -145,6 +148,7 @@ var (
 		vesting.AppModuleBasic{},
 		liquidity.AppModuleBasic{},
 		router.AppModuleBasic{},
+		mintIbc.AppModuleBasic{},
 	)
 
 	// module account permissions
@@ -157,6 +161,7 @@ var (
 		govtypes.ModuleName:            {authtypes.Burner},
 		liquiditytypes.ModuleName:      {authtypes.Minter, authtypes.Burner},
 		ibctransfertypes.ModuleName:    {authtypes.Minter, authtypes.Burner},
+		mintIbctypes.ModuleName:        nil,
 	}
 )
 
@@ -200,6 +205,7 @@ type GaiaApp struct { // nolint: golint
 	AuthzKeeper      authzkeeper.Keeper
 	LiquidityKeeper  liquiditykeeper.Keeper
 	RouterKeeper     routerkeeper.Keeper
+	MintIbcKeeper    mintIbcKeeper.Keeper
 
 	// make scoped keepers public for test purposes
 	ScopedIBCKeeper      capabilitykeeper.ScopedKeeper
@@ -249,7 +255,7 @@ func NewGaiaApp(
 		minttypes.StoreKey, distrtypes.StoreKey, slashingtypes.StoreKey,
 		govtypes.StoreKey, paramstypes.StoreKey, ibchost.StoreKey, upgradetypes.StoreKey,
 		evidencetypes.StoreKey, liquiditytypes.StoreKey, ibctransfertypes.StoreKey,
-		capabilitytypes.StoreKey, feegrant.StoreKey, authzkeeper.StoreKey, routertypes.StoreKey,
+		capabilitytypes.StoreKey, feegrant.StoreKey, authzkeeper.StoreKey, routertypes.StoreKey, mintIbctypes.StoreKey,
 	)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
@@ -428,6 +434,13 @@ func NewGaiaApp(
 
 	skipGenesisInvariants := cast.ToBool(appOpts.Get(crisis.FlagSkipGenesisInvariants))
 
+	app.MintIbcKeeper = mintIbcKeeper.NewKeeper(appCodec,
+		keys[mintIbctypes.StoreKey],
+		app.GetSubspace(mintIbctypes.ModuleName),
+		app.AccountKeeper,
+		app.BankKeeper,
+	)
+
 	// NOTE: Any module instantiated in the module manager that is later modified
 	// must be passed by reference here.
 	app.mm = module.NewManager(
@@ -456,6 +469,7 @@ func NewGaiaApp(
 		liquidity.NewAppModule(appCodec, app.LiquidityKeeper, app.AccountKeeper, app.BankKeeper, app.DistrKeeper),
 		transferModule,
 		routerModule,
+		mintIbc.NewAppModule(appCodec, app.MintIbcKeeper, app.BankKeeper),
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that
@@ -473,6 +487,7 @@ func NewGaiaApp(
 		liquiditytypes.ModuleName,
 		ibchost.ModuleName,
 		routertypes.ModuleName,
+		mintIbctypes.ModuleName,
 	)
 	app.mm.SetOrderEndBlockers(
 		crisistypes.ModuleName,
@@ -498,6 +513,7 @@ func NewGaiaApp(
 		govtypes.ModuleName,
 		minttypes.ModuleName,
 		crisistypes.ModuleName,
+		mintIbctypes.ModuleName,
 		ibchost.ModuleName,
 		genutiltypes.ModuleName,
 		evidencetypes.ModuleName,
@@ -783,6 +799,7 @@ func initParamsKeeper(appCodec codec.BinaryCodec, legacyAmino *codec.LegacyAmino
 	paramsKeeper.Subspace(ibctransfertypes.ModuleName)
 	paramsKeeper.Subspace(ibchost.ModuleName)
 	paramsKeeper.Subspace(routertypes.ModuleName).WithKeyTable(routertypes.ParamKeyTable())
+	paramsKeeper.Subspace(mintIbctypes.ModuleName)
 
 	return paramsKeeper
 }
