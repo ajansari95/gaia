@@ -161,7 +161,7 @@ var (
 		govtypes.ModuleName:            {authtypes.Burner},
 		liquiditytypes.ModuleName:      {authtypes.Minter, authtypes.Burner},
 		ibctransfertypes.ModuleName:    {authtypes.Minter, authtypes.Burner},
-		mintIbctypes.ModuleName:        nil,
+		mintIbctypes.ModuleName:        {authtypes.Minter, authtypes.Burner},
 	}
 )
 
